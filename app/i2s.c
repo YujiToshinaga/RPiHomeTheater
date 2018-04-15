@@ -124,6 +124,18 @@
 #define PCM_TXC_CH2WID_SFT      0
 #define PCM_TXC_CH2WID_MSK      (0xf << 0)
 
+#define PCM_INTEN_RXERR_BIT     (0x1 << 3)
+#define PCM_INTEN_TXERR_BIT     (0x1 << 2)
+#define PCM_INTEN_RXR_BIT       (0x1 << 1)
+#define PCM_INTEN_TXW_BIT       (0x1 << 0)
+
+#define PCM_INTSTC_RXERR_BIT    (0x1 << 3)
+#define PCM_INTSTC_TXERR_BIT    (0x1 << 2)
+#define PCM_INTSTC_RXR_BIT      (0x1 << 1)
+#define PCM_INTSTC_TXW_BIT      (0x1 << 0)
+
+void (*pi2s_rcv_func)(void);
+
 void i2s_init(int master_mode, int sr, int bit)
 {
     /*
@@ -206,10 +218,8 @@ void i2s_init(int master_mode, int sr, int bit)
         case 24:
         case 32:
             sil_wrw_mem((uint32_t *)PCM_MODE_A,
-                    PCM_MODE_CLKM_BIT |
-                    PCM_MODE_CLKI_BIT |
-                    PCM_MODE_FSM_BIT |
-                    PCM_MODE_FSI_BIT |
+                    PCM_MODE_CLKM_BIT | PCM_MODE_CLKI_BIT |
+                    PCM_MODE_FSM_BIT | PCM_MODE_FSI_BIT |
                     ((256 - 1) << PCM_MODE_FLEN_SFT) |
                     (128 << PCM_MODE_FSLEN_SFT));
             sil_wrw_mem((uint32_t *)PCM_RXC_A,
@@ -234,7 +244,31 @@ void i2s_init(int master_mode, int sr, int bit)
     }
 }
 
-void i2s_read(uint32_t *val_l, uint32_t *val_r)
+bool_t i2s_rcv_rdy(void) {
+    bool_t ready;
+
+    if ((sil_rew_mem((uint32_t *)PCM_CS_A) & PCM_CS_RXD_BIT)
+            == PCM_CS_RXD_BIT) {
+        ready = true;
+    } else {
+        ready = false;
+    }
+    return ready;
+}
+
+bool_t i2s_snd_rdy(void) {
+    bool_t ready;
+
+    if ((sil_rew_mem((uint32_t *)PCM_CS_A) & PCM_CS_TXD_BIT)
+            == PCM_CS_TXD_BIT) {
+        ready = true;
+    } else {
+        ready = false;
+    }
+    return ready;
+}
+
+void i2s_rcv_data(uint32_t *val_l, uint32_t *val_r)
 {
     while ((sil_rew_mem((uint32_t *)PCM_CS_A) & PCM_CS_RXD_BIT) == 0x0);
     *val_l = sil_rew_mem((uint32_t *)PCM_FIFO_A);
@@ -242,7 +276,7 @@ void i2s_read(uint32_t *val_l, uint32_t *val_r)
     *val_r = sil_rew_mem((uint32_t *)PCM_FIFO_A);
 }
 
-void i2s_write(uint32_t *val_l, uint32_t *val_r)
+void i2s_snd_data(uint32_t *val_l, uint32_t *val_r)
 {
     while ((sil_rew_mem((uint32_t *)PCM_CS_A) & PCM_CS_TXD_BIT) == 0x0);
     sil_wrw_mem((uint32_t *)PCM_FIFO_A, *val_l);
@@ -250,3 +284,44 @@ void i2s_write(uint32_t *val_l, uint32_t *val_r)
     sil_wrw_mem((uint32_t *)PCM_FIFO_A, *val_r);
 }
 
+void i2s_rcv_int_ena(void) {
+    uint32_t tmp;
+
+    tmp = sil_rew_mem((uint32_t *)PCM_CS_A);
+    tmp |= PCM_CS_SYNC_BIT | PCM_CS_RXERR_BIT;
+    tmp |= PCM_CS_RXTHR_SINGLE;
+    tmp |= PCM_CS_RXCLR_BIT;
+    sil_wrw_mem((uint32_t *)PCM_CS_A, tmp);
+
+    tmp = sil_rew_mem((uint32_t *)PCM_INTEN_A);
+    tmp |= PCM_INTEN_RXR_BIT;
+    sil_wrw_mem((uint32_t *)PCM_INTEN_A, tmp);
+}
+
+void i2s_rcv_int_dis(void) {
+    uint32_t tmp;
+
+    tmp = sil_rew_mem((uint32_t *)PCM_INTEN_A);
+    tmp &= ~PCM_INTEN_RXR_BIT;
+    sil_wrw_mem((uint32_t *)PCM_INTEN_A, tmp);
+
+    tmp = sil_rew_mem((uint32_t *)PCM_INTSTC_A);
+    tmp |= PCM_INTSTC_RXR_BIT;
+    sil_wrw_mem((uint32_t *)PCM_INTSTC_A, tmp);
+}
+
+void i2s_snd_int_ena(void) {
+}
+
+void i2s_snd_int_dis(void) {
+}
+
+void sio_isr(intptr_t exinf)
+{
+    if ((sil_rew_mem((uint32_t *)PCM_INTSTC_A) & PCM_INTSTC_RXR_BIT)
+            == PCM_INTSTC_RXR_BIT) {
+        // call function
+        sil_wrw_mem((uint32_t *)PCM_INTSTC_A,
+                sil_rew_mem((uint32_t *)PCM_INTSTC_A) | PCM_INTSTC_RXR_BIT);
+    }
+}

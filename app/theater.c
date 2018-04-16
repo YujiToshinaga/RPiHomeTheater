@@ -42,18 +42,17 @@ void main_task(intptr_t exinf)
 //	sta_cyc(cychdr_id[(int)exinf - 1]);
 //	slp_tsk();
 
-    audio_init();
+//    audio_open();
 
     if ((int)exinf == 1) {
         count = 0;
         for ( ; ; ) {
-            audio_read(inbuf_l, inbuf_r);
-            syslog(LOG_NOTICE, "prc %d : Sample program ends", (int)exinf);
+//            audio_read_data(inbuf_l, inbuf_r);
             for (i = 0; i < 128; i++) {
                 outbuf_l[i] = inbuf_l[i];
                 outbuf_r[i] = inbuf_r[i];
             }
-            audio_write(outbuf_l, outbuf_r);
+//            audio_write_data(outbuf_l, outbuf_r);
 
             if ((count % 48000) == 0) {
                 syslog(LOG_NOTICE, "%08x", inbuf_l[0]);

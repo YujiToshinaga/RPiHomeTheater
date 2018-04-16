@@ -134,7 +134,8 @@
 #define PCM_INTSTC_RXR_BIT      (0x1 << 1)
 #define PCM_INTSTC_TXW_BIT      (0x1 << 0)
 
-void (*pi2s_rcv_func)(void);
+void (*i2s_rcv_cb)(void);
+void (*i2s_snd_cb)(void);
 
 void i2s_init(int master_mode, int sr, int bit)
 {
@@ -244,7 +245,8 @@ void i2s_init(int master_mode, int sr, int bit)
     }
 }
 
-bool_t i2s_rcv_rdy(void) {
+bool_t i2s_rcv_isrdy(void)
+{
     bool_t ready;
 
     if ((sil_rew_mem((uint32_t *)PCM_CS_A) & PCM_CS_RXD_BIT)
@@ -256,7 +258,8 @@ bool_t i2s_rcv_rdy(void) {
     return ready;
 }
 
-bool_t i2s_snd_rdy(void) {
+bool_t i2s_snd_isrdy(void)
+{
     bool_t ready;
 
     if ((sil_rew_mem((uint32_t *)PCM_CS_A) & PCM_CS_TXD_BIT)
@@ -284,8 +287,11 @@ void i2s_snd_data(uint32_t *val_l, uint32_t *val_r)
     sil_wrw_mem((uint32_t *)PCM_FIFO_A, *val_r);
 }
 
-void i2s_rcv_int_ena(void) {
+void i2s_rcv_int_ena(void (*callback)(void))
+{
     uint32_t tmp;
+
+    i2s_rcv_cb = callback;
 
     tmp = sil_rew_mem((uint32_t *)PCM_CS_A);
     tmp |= PCM_CS_SYNC_BIT | PCM_CS_RXERR_BIT;
@@ -298,7 +304,8 @@ void i2s_rcv_int_ena(void) {
     sil_wrw_mem((uint32_t *)PCM_INTEN_A, tmp);
 }
 
-void i2s_rcv_int_dis(void) {
+void i2s_rcv_int_dis(void)
+{
     uint32_t tmp;
 
     tmp = sil_rew_mem((uint32_t *)PCM_INTEN_A);
@@ -310,17 +317,19 @@ void i2s_rcv_int_dis(void) {
     sil_wrw_mem((uint32_t *)PCM_INTSTC_A, tmp);
 }
 
-void i2s_snd_int_ena(void) {
+void i2s_snd_int_ena(void (*callback)(void))
+{
 }
 
-void i2s_snd_int_dis(void) {
+void i2s_snd_int_dis(void)
+{
 }
 
-void sio_isr(intptr_t exinf)
+void i2s_isr(intptr_t exinf)
 {
     if ((sil_rew_mem((uint32_t *)PCM_INTSTC_A) & PCM_INTSTC_RXR_BIT)
             == PCM_INTSTC_RXR_BIT) {
-        // call function
+        i2s_rcv_cb();
         sil_wrw_mem((uint32_t *)PCM_INTSTC_A,
                 sil_rew_mem((uint32_t *)PCM_INTSTC_A) | PCM_INTSTC_RXR_BIT);
     }

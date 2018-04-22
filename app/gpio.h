@@ -10,11 +10,12 @@
 #define GPIO_FSEL_4     6
 #define GPIO_FSEL_5     7
 
-#define GPIO_SET_HIGH   0
-#define GPIO_SET_LOW    1
+#define GPIO_LEVEL_HIGH   0
+#define GPIO_LEVEL_LOW    1
 
-extern void gpio_init();
-extern void gpio_fsel(int id, int sel);
-extern void gpio_set(int id, int set);
+extern void gpio_init(void);
+extern void gpio_fsel(int id, int fsel);
+extern void gpio_set(int id, int level);
+extern int gpio_get(int id);
 
 #endif /* GPIO_H */

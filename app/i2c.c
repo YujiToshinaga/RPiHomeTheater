@@ -1,10 +1,4 @@
 #include <kernel.h>
-#include <t_syslog.h>
-#include <t_stdlib.h>
-#include <sil.h>
-#include "syssvc/serial.h"
-#include "syssvc/syslog.h"
-
 #include "gpio.h"
 #include "i2c.h"
 
@@ -69,16 +63,12 @@ void i2c_init(int master_id, uint8_t slave_addr)
         break;
     }
 
-    /*
-     *  GPIOをI2Cに切り替え
-     */
+    // GPIOをI2Cに切り替える
     gpio_fsel(sda_gpio_id, sda_gpio_fsel);
     gpio_fsel(scl_gpio_id, scl_gpio_fsel);
 
-    /*
-     *  I2Cを初期化
-     */
-    // I2Cを有効にして，FIFOをクリアする
+    // I2Cを初期化する
+    // I2Cを有効にしてFIFOをクリアする
     sil_wrw_mem((uint32_t *)(base + I2C_C),
             I2C_C_I2CEN_BIT | I2C_C_CLEAR_CLEAR);
 

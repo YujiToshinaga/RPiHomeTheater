@@ -7,6 +7,11 @@
 #include "kernel_cfg.h"
 
 #include "theater.h"
+#include "gpio.h"
+#include "i2c.h"
+#include "i2s.h"
+#include "wm8731.h"
+#include "pwm.h"
 #include "audio.h"
 
 //uint_t const task1_id[TNUM_PRCID] = {TASK1_1, TASK1_2, TASK1_3, TASK1_4};
@@ -32,7 +37,8 @@ void main_task(intptr_t exinf)
     int count;
     int i;
 
-	syslog_msk_log(LOG_UPTO(LOG_INFO), LOG_UPTO(LOG_EMERG));
+//	syslog_msk_log(LOG_UPTO(LOG_INFO), LOG_UPTO(LOG_EMERG));
+	syslog_msk_log(0, LOG_UPTO(LOG_INFO));
 	serial_opn_por(TASK_PORTID_G_SYSLOG);
 	serial_ctl_por(TASK_PORTID_G_SYSLOG,
 			(IOCTL_CRLF | IOCTL_FCSND | IOCTL_FCRCV));
@@ -42,17 +48,34 @@ void main_task(intptr_t exinf)
 //	sta_cyc(cychdr_id[(int)exinf - 1]);
 //	slp_tsk();
 
-//    audio_open();
+	tslp_tsk(1000);
+
+	syslog(LOG_EMERG, "initialize IO");
+
+    gpio_init();
+    i2c_init(I2C_MSTR1, 0x1a);
+    i2s_init(I2S_SLAV, 48000, 32);
+    wm8731_init(WM8731_MSTR, 48000, 32);
+
+	tslp_tsk(1000);
+
+	syslog(LOG_EMERG, "open");
+
+    audio_open();
+
+	syslog(LOG_EMERG, "opened");
+
+	tslp_tsk(1000);
 
     if ((int)exinf == 1) {
         count = 0;
         for ( ; ; ) {
-//            audio_read_data(inbuf_l, inbuf_r);
+            audio_read_data(inbuf_l, inbuf_r);
             for (i = 0; i < 128; i++) {
                 outbuf_l[i] = inbuf_l[i];
                 outbuf_r[i] = inbuf_r[i];
             }
-//            audio_write_data(outbuf_l, outbuf_r);
+            audio_write_data(outbuf_l, outbuf_r);
 
             if ((count % 48000) == 0) {
                 syslog(LOG_NOTICE, "%08x", inbuf_l[0]);

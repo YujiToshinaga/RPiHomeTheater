@@ -1,13 +1,7 @@
 #include <kernel.h>
-#include <t_syslog.h>
-#include <t_stdlib.h>
-#include <sil.h>
-#include "syssvc/serial.h"
-#include "syssvc/syslog.h"
-
 #include "gpio.h"
 
-void gpio_init()
+void gpio_init(void)
 {
     sil_wrw_mem((uint32_t *)GPIO_GPPUD, 0x0);
 }
@@ -101,19 +95,43 @@ void gpio_fsel(int id, int fsel)
     }
 }
 
-void gpio_set(int id, int set)
+void gpio_set(int id, int level)
 {
     if ((id >= 0) && (id < 32)) {
-        if (set == GPIO_SET_HIGH) {
+        if (level == GPIO_LEVEL_HIGH) {
             sil_wrw_mem((uint32_t *)GPIO_GPSET0, (0x1 << (id - 0)));
         } else {
             sil_wrw_mem((uint32_t *)GPIO_GPCLR0, (0x1 << (id - 0)));
         }
     } else if ((id >= 32) && (id <= 53)) {
-        if (set == GPIO_SET_HIGH) {
+        if (level == GPIO_LEVEL_HIGH) {
             sil_wrw_mem((uint32_t *)GPIO_GPSET1, (0x1 << (id - 32)));
         } else {
             sil_wrw_mem((uint32_t *)GPIO_GPCLR1, (0x1 << (id - 32)));
         }
     } 
+}
+
+int gpio_get(int id)
+{
+    uint32_t tmp;
+    int level = GPIO_LEVEL_LOW;
+
+    if ((id >= 0) && (id < 32)) {
+        tmp = sil_rew_mem((uint32_t *)GPIO_GPLEV0);
+        if (tmp & (0x1 << (id - 0))) {
+            level = GPIO_LEVEL_HIGH;
+        } else {
+            level = GPIO_LEVEL_LOW;
+        }
+    } else if ((id >= 32) && (id <= 53)) {
+        tmp = sil_rew_mem((uint32_t *)GPIO_GPLEV1);
+        if (tmp & (0x1 << (id - 32))) {
+            level = GPIO_LEVEL_HIGH;
+        } else {
+            level = GPIO_LEVEL_LOW;
+        }
+    } 
+
+    return level;
 }

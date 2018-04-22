@@ -5,7 +5,6 @@
 #include "syssvc/serial.h"
 #include "syssvc/syslog.h"
 #include "kernel_cfg.h"
-#include "audio.h"
 
 #include "theater.h"
 #include "gpio.h"
@@ -13,8 +12,8 @@
 #include "i2s.h"
 #include "wm8731.h"
 #include "pwm.h"
+#include "audio.h"
 
-#define QUEUE_SIZE 512
 #define queue_next(n) (((n) + 1) % QUEUE_SIZE)
 
 typedef struct buf_queue {
@@ -29,103 +28,125 @@ static BUFQ outbufq;
 
 void audio_queue_init(BUFQ *q);
 bool_t audio_queue_isempty(BUFQ *q);
+bool_t audio_queue_isleastone(BUFQ *q);
 bool_t audio_queue_isfull(BUFQ *q);
-bool_t audio_queue_getnum(BUFQ *q);
+bool_t audio_queue_isspace(BUFQ *q);
+int audio_queue_getnum(BUFQ *q);
 bool_t audio_queue_push(BUFQ *q, uint32_t *pval_l, uint32_t *pval_r);
 bool_t audio_queue_pop(BUFQ *q, uint32_t *pval_l, uint32_t *pval_r);
 
 void audio_open(void) {
-    static bool_t open_flag = false;
+    ini_sem(AUDIO_READ_SEM);
+    ini_sem(AUDIO_WRITE_SEM);
 
-    if (open_flag == false) {
-        ini_sem(AUDIO_READ_SEM);
-        ini_sem(AUDIO_WRITE_SEM);
-
-        gpio_init();
-        i2c_init(I2C_MSTR1, 0x1a);
-        i2s_init(I2S_SLAV, 48000, 32);
-        wm8731_init(WM8731_MSTR, 48000, 32);
-        wm8713_active();
-
-        open_flag = true;
-    }
-
-    i2s_rcv_int_ena(audio_read_rdy_cb);
-    i2s_snd_int_ena(audio_write_rdy_cb);
+    wm8713_active();
 }
 
 void audio_close(void) {
+    ini_sem(AUDIO_READ_SEM);
+    ini_sem(AUDIO_WRITE_SEM);
+
     i2s_rcv_int_dis();
     i2s_snd_int_dis();
+
+    wm8713_inactive();
 }
 
-void audio_read_data(uint32_t *pbuf_l, uint32_t *pbuf_r)
+bool_t audio_read_data(uint32_t *pbuf_l, uint32_t *pbuf_r)
 {
+    uint32_t l, r;
+    bool_t read = false;
     int i;
 
-    syslog(LOG_NOTICE, "audio_read_data called");
+    while ((audio_queue_isspace(&inbufq) == true)
+            && (i2s_rcv_isrdy() == true)) {
+        i2s_rcv_data(&l, &r);
+        audio_queue_push(&inbufq, &l, &r);
+    }
 
-    if (audio_queue_getnum(&inbufq) < 128) {
+    if (audio_queue_getnum(&inbufq) >= BUFFERING_SIZE) {
+        i2s_rcv_int_dis();
+    } else {
+        i2s_rcv_int_ena(audio_read_rdy_cb);
         wai_sem(AUDIO_READ_SEM);
     }
 
-    for (i = 0; i < 128; i++) {
-        audio_queue_pop(&inbufq, pbuf_l, pbuf_r);
-        pbuf_l++;
-        pbuf_r++;
+    if (audio_queue_getnum(&inbufq) >= BUFFERING_SIZE) {
+        for (i = 0; i < BUFFERING_SIZE; i++) {
+            audio_queue_pop(&inbufq, pbuf_l, pbuf_r);
+            pbuf_l++;
+            pbuf_r++;
+        }
+        read = true;
+    } else {
+        read = false;
     }
+
+    return read;
 }
 
 void audio_read_rdy_cb(void)
 {
     uint32_t l, r;
-    bool_t push_result = false;
 
-    while (i2s_rcv_isrdy() == true) {
+    while ((audio_queue_isspace(&inbufq) == true)
+            && (i2s_rcv_isrdy() == true)) {
         i2s_rcv_data(&l, &r);
-        push_result = audio_queue_push(&inbufq, &l, &r);
-        if (push_result == false) {
-            // overflow
-        }
+        audio_queue_push(&inbufq, &l, &r);
     }
 
-    if (audio_queue_getnum(&inbufq) >= 128) {
+    if (audio_queue_getnum(&inbufq) >= BUFFERING_SIZE) {
+        i2s_rcv_int_dis();
         isig_sem(AUDIO_READ_SEM);
     }
 }
 
-void audio_write_data(uint32_t *pbuf_l, uint32_t *pbuf_r)
+bool_t audio_write_data(uint32_t *pbuf_l, uint32_t *pbuf_r)
 {
+    uint32_t l, r;
+    int written = false;
     int i;
 
-    syslog(LOG_NOTICE, "audio_read_data called");
+    while ((audio_queue_isleastone(&outbufq) == true)
+            && (i2s_snd_isrdy() == true)) {
+        audio_queue_pop(&outbufq, &l, &r);
+        i2s_snd_data(&l, &r);
+    }
 
-    if (audio_queue_getnum(&outbufq) >= (512 - 128)) {
+    if (audio_queue_getnum(&outbufq) < (QUEUE_SIZE - BUFFERING_SIZE)) {
+        i2s_snd_int_dis();
+    } else {
+        i2s_snd_int_ena(audio_write_rdy_cb);
         wai_sem(AUDIO_WRITE_SEM);
     }
 
-    for (i = 0; i < 128; i++) {
-        audio_queue_push(&outbufq, pbuf_l, pbuf_r);
-        pbuf_l++;
-        pbuf_r++;
+    if (audio_queue_getnum(&outbufq) < (QUEUE_SIZE - BUFFERING_SIZE)) {
+        for (i = 0; i < BUFFERING_SIZE; i++) {
+            audio_queue_push(&outbufq, pbuf_l, pbuf_r);
+            pbuf_l++;
+            pbuf_r++;
+        }
+        written = true;
+    } else {
+        i2s_snd_int_dis();
+        written = false;
     }
+
+    return written;
 }
 
 void audio_write_rdy_cb(void)
 {
     uint32_t l, r;
-    bool_t pop_result = false;
 
-    while (i2s_snd_isrdy() == true) {
-        pop_result = audio_queue_pop(&outbufq, &l, &r);
-        if (pop_result == false) {
-            // underflow
-        } else {
-            i2s_snd_data(&l, &r);
-        }
+    while ((audio_queue_isleastone(&outbufq) == true)
+            && (i2s_snd_isrdy() == true)) {
+        audio_queue_pop(&outbufq, &l, &r);
+        i2s_snd_data(&l, &r);
     }
 
-    if (audio_queue_getnum(&outbufq) < (512 - 128)) {
+    if (audio_queue_getnum(&outbufq) < (QUEUE_SIZE - BUFFERING_SIZE)) {
+        i2s_snd_int_ena(audio_write_rdy_cb);
         isig_sem(AUDIO_WRITE_SEM);
     }
 }
@@ -148,6 +169,18 @@ bool_t audio_queue_isempty(BUFQ *q)
     return empty;
 }
 
+bool_t audio_queue_isleastone(BUFQ *q)
+{
+    bool_t empty = false;
+
+    if (q->head != q->tail) {
+        empty = true;
+    } else {
+        empty = false;
+    }
+    return empty;
+}
+
 bool_t audio_queue_isfull(BUFQ *q)
 {
     bool_t full = false;
@@ -160,7 +193,19 @@ bool_t audio_queue_isfull(BUFQ *q)
     return full;
 }
 
-bool_t audio_queue_getnum(BUFQ *q)
+bool_t audio_queue_isspace(BUFQ *q)
+{
+    bool_t full = false;
+
+    if (queue_next(q->tail) != q->head) {
+        full = true;
+    } else {
+        full = false;
+    }
+    return full;
+}
+
+int audio_queue_getnum(BUFQ *q)
 {
     bool_t num = 0;
 

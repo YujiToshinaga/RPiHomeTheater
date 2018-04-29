@@ -8,6 +8,7 @@
 
 #include "theater.h"
 #include "gpio.h"
+#include "dma.h"
 #include "i2c.h"
 #include "i2s.h"
 #include "wm8731.h"
@@ -55,6 +56,7 @@ void main_task(intptr_t exinf)
     gpio_init();
     i2c_init(I2C_MSTR1, 0x1a);
     i2s_init(I2S_SLAV, 48000, 32);
+    pwm_init(48000, 32);
     wm8731_init(WM8731_MSTR, 48000, 32);
 
 	tslp_tsk(1000);
@@ -77,9 +79,9 @@ void main_task(intptr_t exinf)
             }
             audio_write_data(outbuf_l, outbuf_r);
 
-            if ((count % 48000) == 0) {
-                syslog(LOG_NOTICE, "%08x", inbuf_l[0]);
-            }
+//            if ((count % 48000) == 0) {
+//                syslog(LOG_NOTICE, "%08x", inbuf_l[0]);
+//            }
             count = count + 128;
         }
     }

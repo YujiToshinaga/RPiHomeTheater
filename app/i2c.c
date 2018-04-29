@@ -43,6 +43,7 @@ void i2c_init(int master_id, uint8_t slave_addr)
     int scl_gpio_id = 0;
     int scl_gpio_fsel = 0;
 
+    // I2CのMaster IDによってアクセスするIOを決める
     switch (master_id) {
     case I2C_MSTR0:
         base = I2C_MSTR0_BASE;

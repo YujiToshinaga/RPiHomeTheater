@@ -6,6 +6,7 @@
 #include "syssvc/syslog.h"
 
 #include "gpio.h"
+#include "dma.h"
 #include "pwm.h"
 
 // Clock Manager
@@ -80,6 +81,12 @@
 #define PWM_STA_EMPT1_BIT       (0x1 << 1)
 #define PWM_STA_FULL1_BIT       (0x1 << 0)
 
+#define PWM_DMAC_ENAB_BIT       (0x1 << 31)
+#define PWM_DMAC_PANIC_SFT      8
+#define PWM_DMAC_PANIC_MSK      (0xff << 8)
+#define PWM_DMAC_DREQ_SFT       0
+#define PWM_DMAC_DREQ_MSK       (0xff << 0)
+
 void pwm_init(int sr, int bit)
 {
     // GPIOをPWMに切り替える
@@ -99,37 +106,34 @@ void pwm_init(int sr, int bit)
             CM_PWMCTL_INT | CM_PWMCTL_ENAB_BIT | CM_PWMCTL_SRC_PLLD);
 
     // PWMを初期化する
-    sil_wrw_mem((uint32_t *)PWM_RNG1, 250000000 / 48000);
-    sil_wrw_mem((uint32_t *)PWM_RNG2, 250000000 / 48000);
+    sil_wrw_mem((uint32_t *)PWM_RNG1, 250000000 / sr);
+    sil_wrw_mem((uint32_t *)PWM_RNG2, 250000000 / sr);
     sil_wrw_mem((uint32_t *)PWM_CTL, PWM_CTL_USEF2_BIT | PWM_CTL_PWEN2_BIT |
             PWM_CTL_CLRF1_BIT | PWM_CTL_USEF1_BIT | PWM_CTL_PWEN1_BIT);
 }
 
 bool_t pwm_snd_isrdy(void)
 {
+    bool_t ready = false;
+
+    if ((sil_rew_mem((uint32_t *)PWM_STA) & PWM_STA_FULL1_BIT)
+            != PWM_STA_FULL1_BIT) {
+        ready = true;
+    } else {
+        ready = false;
+    }
+    return ready;
 }
 
 void pwm_snd_data(uint32_t* val_l, uint32_t* val_r)
 {
-    while ((sil_rew_mem((uint32_t *)PWM_STA) & PWM_STA_FULL1_BIT)
-            == PWM_STA_FULL1_BIT);
+//    while ((sil_rew_mem((uint32_t *)PWM_STA) & PWM_STA_FULL1_BIT)
+//            == PWM_STA_FULL1_BIT);
     sil_wrw_mem((uint32_t *)PWM_FIF1,
             ((*val_l >> (32 - 11)) + (1 << (11 - 1))) & ((1 << 11) - 1));
-    while ((sil_rew_mem((uint32_t *)PWM_STA) & PWM_STA_FULL1_BIT)
-            == PWM_STA_FULL1_BIT);
+//    while ((sil_rew_mem((uint32_t *)PWM_STA) & PWM_STA_FULL1_BIT)
+//            == PWM_STA_FULL1_BIT);
     sil_wrw_mem((uint32_t *)PWM_FIF1,
             ((*val_l >> (32 - 11)) + (1 << (11 - 1))) & ((1 << 11) - 1));
 }
-
-//void pwm_write_16(int16_t* val_l, int16_t* val_r)
-//{
-//    while ((sil_rew_mem((uint32_t *)PWM_STA) & PWM_STA_FULL1_BIT)
-//            == PWM_STA_FULL1_BIT);
-//    sil_wrw_mem((uint32_t *)PWM_FIF1,
-//            ((uint32_t)(*val_l >> (16 - 11)) + (1 << (11 - 1))) & ((1 << 11) - 1));
-//    while ((sil_rew_mem((uint32_t *)PWM_STA) & PWM_STA_FULL1_BIT)
-//            == PWM_STA_FULL1_BIT);
-//    sil_wrw_mem((uint32_t *)PWM_FIF1,
-//            ((uint32_t)(*val_l >> (16 - 11)) + (1 << (11 - 1))) & ((1 << 11) - 1));
-//}
 

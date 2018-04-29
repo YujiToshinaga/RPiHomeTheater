@@ -107,10 +107,13 @@ bool_t audio_write_data(uint32_t *pbuf_l, uint32_t *pbuf_r)
     int written = false;
     int i;
 
+//	syslog(LOG_EMERG, "audio_write_data");
+
     while ((audio_queue_isleastone(&outbufq) == true)
             && (i2s_snd_isrdy() == true)) {
         audio_queue_pop(&outbufq, &l, &r);
         i2s_snd_data(&l, &r);
+        pwm_snd_data(&l, &r);
     }
 
     if (audio_queue_getnum(&outbufq) < (QUEUE_SIZE - BUFFERING_SIZE)) {
@@ -143,6 +146,7 @@ void audio_write_rdy_cb(void)
             && (i2s_snd_isrdy() == true)) {
         audio_queue_pop(&outbufq, &l, &r);
         i2s_snd_data(&l, &r);
+        pwm_snd_data(&l, &r);
     }
 
     if (audio_queue_getnum(&outbufq) < (QUEUE_SIZE - BUFFERING_SIZE)) {

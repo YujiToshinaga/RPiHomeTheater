@@ -286,13 +286,6 @@ void i2s_rcv_int_ena(void (*callback)(void))
 
     i2s_rcv_cb = callback;
 
-//    tmp = sil_rew_mem((uint32_t *)PCM_CS_A);
-//    tmp |= PCM_CS_SYNC_BIT | PCM_CS_RXERR_BIT;
-////    tmp |= PCM_CS_RXTHR_SINGLE;
-//    tmp |= PCM_CS_RXTHR_FULL;
-//    tmp |= PCM_CS_RXCLR_BIT;
-//    sil_wrw_mem((uint32_t *)PCM_CS_A, tmp);
-
     tmp = sil_rew_mem((uint32_t *)PCM_INTEN_A);
     tmp |= PCM_INTEN_RXR_BIT;
     sil_wrw_mem((uint32_t *)PCM_INTEN_A, tmp);
@@ -305,10 +298,6 @@ void i2s_rcv_int_dis(void)
     tmp = sil_rew_mem((uint32_t *)PCM_INTEN_A);
     tmp &= ~PCM_INTEN_RXR_BIT;
     sil_wrw_mem((uint32_t *)PCM_INTEN_A, tmp);
-
-//    tmp = sil_rew_mem((uint32_t *)PCM_INTSTC_A);
-//    tmp |= PCM_INTSTC_RXR_BIT;
-//    sil_wrw_mem((uint32_t *)PCM_INTSTC_A, tmp);
 }
 
 void i2s_snd_int_ena(void (*callback)(void))

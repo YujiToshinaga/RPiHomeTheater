@@ -6,7 +6,6 @@
 #include "syssvc/syslog.h"
 
 #include "gpio.h"
-#include "dma.h"
 #include "pwm.h"
 
 // Clock Manager
@@ -106,8 +105,8 @@ void pwm_init(int sr, int bit)
             CM_PWMCTL_INT | CM_PWMCTL_ENAB_BIT | CM_PWMCTL_SRC_PLLD);
 
     // PWMを初期化する
-    sil_wrw_mem((uint32_t *)PWM_RNG1, 250000000 / sr);
-    sil_wrw_mem((uint32_t *)PWM_RNG2, 250000000 / sr);
+    sil_wrw_mem((uint32_t *)PWM_RNG1, 250000000 / sr + 100);
+    sil_wrw_mem((uint32_t *)PWM_RNG2, 250000000 / sr + 100);
     sil_wrw_mem((uint32_t *)PWM_CTL, PWM_CTL_USEF2_BIT | PWM_CTL_PWEN2_BIT |
             PWM_CTL_CLRF1_BIT | PWM_CTL_USEF1_BIT | PWM_CTL_PWEN1_BIT);
 }

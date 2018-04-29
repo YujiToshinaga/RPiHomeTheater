@@ -25,6 +25,7 @@ typedef struct buf_queue {
 
 static BUFQ inbufq;
 static BUFQ outbufq;
+static BUFQ outbufq_s;
 
 void audio_queue_init(BUFQ *q);
 bool_t audio_queue_isempty(BUFQ *q);
@@ -38,6 +39,10 @@ bool_t audio_queue_pop(BUFQ *q, uint32_t *pval_l, uint32_t *pval_r);
 void audio_open(void) {
     ini_sem(AUDIO_READ_SEM);
     ini_sem(AUDIO_WRITE_SEM);
+
+    audio_queue_init(&inbufq);
+    audio_queue_init(&outbufq);
+    audio_queue_init(&outbufq_s);
 
     wm8713_active();
 }
@@ -101,19 +106,19 @@ void audio_read_rdy_cb(void)
     }
 }
 
-bool_t audio_write_data(uint32_t *pbuf_l, uint32_t *pbuf_r)
+bool_t audio_write_data(uint32_t *pbuf_l, uint32_t *pbuf_r,
+        uint32_t *pbuf_ls, uint32_t *pbuf_rs)
 {
-    uint32_t l, r;
+    uint32_t l, r, ls, rs;
     int written = false;
     int i;
-
-//	syslog(LOG_EMERG, "audio_write_data");
 
     while ((audio_queue_isleastone(&outbufq) == true)
             && (i2s_snd_isrdy() == true)) {
         audio_queue_pop(&outbufq, &l, &r);
+        audio_queue_pop(&outbufq_s, &ls, &rs);
         i2s_snd_data(&l, &r);
-        pwm_snd_data(&l, &r);
+        pwm_snd_data(&ls, &rs);
     }
 
     if (audio_queue_getnum(&outbufq) < (QUEUE_SIZE - BUFFERING_SIZE)) {
@@ -126,8 +131,11 @@ bool_t audio_write_data(uint32_t *pbuf_l, uint32_t *pbuf_r)
     if (audio_queue_getnum(&outbufq) < (QUEUE_SIZE - BUFFERING_SIZE)) {
         for (i = 0; i < BUFFERING_SIZE; i++) {
             audio_queue_push(&outbufq, pbuf_l, pbuf_r);
+            audio_queue_push(&outbufq_s, pbuf_ls, pbuf_rs);
             pbuf_l++;
             pbuf_r++;
+            pbuf_ls++;
+            pbuf_rs++;
         }
         written = true;
     } else {
@@ -140,13 +148,14 @@ bool_t audio_write_data(uint32_t *pbuf_l, uint32_t *pbuf_r)
 
 void audio_write_rdy_cb(void)
 {
-    uint32_t l, r;
+    uint32_t l, r, ls, rs;
 
     while ((audio_queue_isleastone(&outbufq) == true)
             && (i2s_snd_isrdy() == true)) {
         audio_queue_pop(&outbufq, &l, &r);
+        audio_queue_pop(&outbufq_s, &ls, &rs);
         i2s_snd_data(&l, &r);
-        pwm_snd_data(&l, &r);
+        pwm_snd_data(&ls, &rs);
     }
 
     if (audio_queue_getnum(&outbufq) < (QUEUE_SIZE - BUFFERING_SIZE)) {

@@ -8,7 +8,6 @@
 
 #include "theater.h"
 #include "gpio.h"
-#include "dma.h"
 #include "i2c.h"
 #include "i2s.h"
 #include "wm8731.h"
@@ -35,6 +34,7 @@ void main_task(intptr_t exinf)
 {
     uint32_t inbuf_l[128], inbuf_r[128];
     uint32_t outbuf_l[128], outbuf_r[128];
+    uint32_t outbuf_ls[128], outbuf_rs[128];
     int count;
     int i;
 
@@ -76,8 +76,10 @@ void main_task(intptr_t exinf)
             for (i = 0; i < 128; i++) {
                 outbuf_l[i] = inbuf_l[i];
                 outbuf_r[i] = inbuf_r[i];
+                outbuf_ls[i] = inbuf_l[i];
+                outbuf_rs[i] = inbuf_r[i];
             }
-            audio_write_data(outbuf_l, outbuf_r);
+            audio_write_data(outbuf_l, outbuf_r, outbuf_ls, outbuf_rs);
 
 //            if ((count % 48000) == 0) {
 //                syslog(LOG_NOTICE, "%08x", inbuf_l[0]);

@@ -181,7 +181,7 @@ ifdef USE_CXX
 else
   APPL_COBJS = $(APPLNAME).o 
 endif
-APPL_COBJS := $(APPL_COBJS) audio.o gpio.o i2c.o i2s.o pwm.o wm8731.o
+APPL_COBJS := $(APPL_COBJS) audio.o gpio.o i2c.o i2s.o pwm.o wm8731.o eff.o
 APPL_COBJS := $(APPL_COBJS) log_output.o vasyslog.o t_perror.o strerror.o
 APPL_CFLAGS =
 APPL_LIBS =

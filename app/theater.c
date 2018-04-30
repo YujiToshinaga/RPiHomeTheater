@@ -13,6 +13,7 @@
 #include "wm8731.h"
 #include "pwm.h"
 #include "audio.h"
+#include "eff.h"
 
 //uint_t const task1_id[TNUM_PRCID] = {TASK1_1, TASK1_2, TASK1_3, TASK1_4};
 //uint_t const cychdr_id[TNUM_PRCID] = {CYCHDR_1, CYCHDR_2, CYCHDR_3, CYCHDR_4};
@@ -30,13 +31,13 @@ void task1(intptr_t exinf)
 //	cnt[(int)exinf - 1]++;
 }
 
+static uint32_t inbuf_l[128], inbuf_r[128];
+static uint32_t outbuf_l[128], outbuf_r[128];
+static uint32_t outbuf_ls[128], outbuf_rs[128];
+
 void main_task(intptr_t exinf)
 {
-    uint32_t inbuf_l[128], inbuf_r[128];
-    uint32_t outbuf_l[128], outbuf_r[128];
-    uint32_t outbuf_ls[128], outbuf_rs[128];
     int count;
-    int i;
 
 //	syslog_msk_log(LOG_UPTO(LOG_INFO), LOG_UPTO(LOG_EMERG));
 	syslog_msk_log(0, LOG_UPTO(LOG_INFO));
@@ -61,24 +62,19 @@ void main_task(intptr_t exinf)
 
 	tslp_tsk(1000);
 
-	syslog(LOG_EMERG, "open");
-
     audio_open();
 
-	syslog(LOG_EMERG, "opened");
-
 	tslp_tsk(1000);
+
+    eff_init();
 
     if ((int)exinf == 1) {
         count = 0;
         for ( ; ; ) {
             audio_read_data(inbuf_l, inbuf_r);
-            for (i = 0; i < 128; i++) {
-                outbuf_l[i] = inbuf_l[i];
-                outbuf_r[i] = inbuf_r[i];
-                outbuf_ls[i] = inbuf_l[i];
-                outbuf_rs[i] = inbuf_r[i];
-            }
+
+            eff(inbuf_l, inbuf_r, outbuf_l, outbuf_r, outbuf_ls, outbuf_rs);
+
             audio_write_data(outbuf_l, outbuf_r, outbuf_ls, outbuf_rs);
 
 //            if ((count % 48000) == 0) {
